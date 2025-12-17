@@ -1,9 +1,15 @@
 console.log('[Widget] Service Worker initialized');
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((error) => console.error(error));
+});
+
 // Handle extension icon click - Open side panel
 chrome.action.onClicked.addListener(async (tab) => {
   try {
-    console.log('[Widget] Icon clicked, opening side panel for tab:', tab.id);
+    console.log('[Widget] Icon clicked for tab:', tab.id);
+    
     await chrome.sidePanel.open({ tabId: tab.id });
     console.log('[Widget] Side panel opened successfully');
   } catch (error) {

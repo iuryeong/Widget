@@ -1,20 +1,10 @@
 /**
  * Sidebar UI Controller
- * This is the main entry point for the sidebar panel
+ * - 날씨: 실제 API 사용 (WidgetAPIs)
+ * - 나머지: 테스트용 더미 데이터 사용
  */
 
 console.log('[Widget] Sidebar loaded');
-
-// API Configuration
-const API_CONFIG = {
-  notifications: 'https://api.example.com/notifications',
-  weather: 'https://api.example.com/weather',
-  stocks: 'https://api.example.com/stocks',
-  time: 'https://api.example.com/time',
-  messages: 'https://api.example.com/messages',
-  videos: 'https://api.example.com/videos',
-  images: 'https://api.example.com/images',
-};
 
 // Global sidebar state
 const sidebarState = {
@@ -39,13 +29,14 @@ async function initSidebar() {
   try {
     console.log('[Widget] Initializing sidebar...');
     
-    // Load settings from storage
-    const result = await chrome.storage.sync.get(['settings', 'widgetSettings']);
-    sidebarState.settings = result.settings;
-    
-    // Load widget settings
-    if (result.widgetSettings) {
-      sidebarState.widgetSettings = result.widgetSettings;
+    // Load settings from storage (에러 방지용 예외처리)
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      const result = await chrome.storage.sync.get(['settings', 'widgetSettings']);
+      sidebarState.settings = result.settings;
+      
+      if (result.widgetSettings) {
+        sidebarState.widgetSettings = result.widgetSettings;
+      }
     }
 
     // Initialize UI
@@ -65,6 +56,8 @@ async function initSidebar() {
  */
 function renderSidebar() {
   const root = document.getElementById('root');
+  if (!root) return;
+
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0].replace(/-/g, '.');
   
@@ -150,13 +143,17 @@ async function loadFeed() {
 
     sidebarState.feedItems = allItems;
     
-    // Render all items
-    container.innerHTML = allItems
-      .map((item) => renderFeedItem(item))
-      .join('');
+    if (allItems.length === 0) {
+        container.innerHTML = '<div style="padding:16px; text-align:center; color:#666">활성화된 위젯이 없습니다.</div>';
+    } else {
+        container.innerHTML = allItems
+        .map((item) => renderFeedItem(item))
+        .join('');
+    }
+
   } catch (error) {
     console.error('[Widget] Error loading feed:', error);
-    container.innerHTML = '<div style="padding: 16px; color: #666;">데이터를 불러오는 중에 오류가 발생했습니다.</div>';
+    container.innerHTML = '<div style="padding: 16px; color: #666;">데이터 로딩 중 오류가 발생했습니다.</div>';
   }
 }
 
@@ -176,15 +173,6 @@ function renderFeedItem(item) {
             </div>
           </div>
           <div class="card-time">${item.time}</div>
-        </div>
-      `;
-    case 'time':
-      return `
-        <div class="feed-card time-card">
-          <h4>${item.title}</h4>
-          <p class="time-display">${new Date().toLocaleTimeString('ko-KR')}</p>
-          <p class="time-date">${new Date().toLocaleDateString('ko-KR')}</p>
-          <span class="card-time">${item.time}</span>
         </div>
       `;
     case 'weather':
@@ -207,15 +195,15 @@ function renderFeedItem(item) {
           </div>
           <div class="stock-price">
             <span class="price">${item.price}</span>
-            <span class="change">${item.change}</span>
+            <span class="change" style="color:${item.change.includes('▲')||item.change.includes('△')?'#d32f2f':'#1976d2'}">${item.change}</span>
           </div>
-          ${item.hasChart ? '<div class="stock-chart" style="height: 40px; background: #f0f0f0; border-radius: 4px;"></div>' : ''}
+          ${item.hasChart ? '<div class="stock-chart" style="height: 40px; background: #f0f0f0; border-radius: 4px; margin-top:8px;"></div>' : ''}
         </div>
       `;
     case 'image':
       return `
         <div class="feed-card image-card">
-          <img src="${item.imageUrl}" alt="Random" onerror="this.src='https://via.placeholder.com/100?text=Image'" />
+          <img src="${item.imageUrl}" alt="Random" style="width:100%; border-radius:8px;" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" />
         </div>
       `;
     case 'message':
@@ -225,7 +213,7 @@ function renderFeedItem(item) {
             <span class="card-icon">${item.icon}</span>
             <p>${item.text}</p>
           </div>
-          <p class="sender">${item.sender}</p>
+          <p class="sender" style="font-size:12px; color:#888; margin-top:5px;">${item.sender}</p>
         </div>
       `;
     case 'video':
@@ -235,8 +223,8 @@ function renderFeedItem(item) {
             <span class="card-icon">${item.icon}</span>
             <h4>${item.title}</h4>
           </div>
-          <div class="video-thumbnail">
-            <img src="${item.thumbnail}" alt="Video" />
+          <div class="video-thumbnail" style="margin-top:8px;">
+            <img src="${item.thumbnail}" alt="Video" style="width:100%; border-radius:8px;" />
           </div>
         </div>
       `;
@@ -246,166 +234,161 @@ function renderFeedItem(item) {
 }
 
 /**
+ * =================================================
  * API Fetch Functions
+ * 날씨: 실제 데이터 사용 (WidgetAPIs)
+ * 나머지: 더미 데이터 사용 (에러 방지)
+ * =================================================
  */
 
-// Fetch notifications from API
-async function fetchNotifications() {
-  try {
-    const response = await fetch(API_CONFIG.notifications);
-    if (!response.ok) throw new Error('Notifications API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Notifications API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'github',
-        type: 'notification',
-        icon: '□',
-        title: 'Git Hub',
-        subtitle: 'New Pull Request !wantoshome!서서 Pull Request 정하고있습니다.',
-        time: '3일 전'
-      },
-      {
-        id: 'gmail',
-        type: 'notification',
-        icon: '✉️',
-        title: 'Gmail',
-        subtitle: 'Google서비스에서 [편 밀림 알림]을 받으셨습니다.',
-        time: '3시간 전'
-      }
-    ];
-  }
-}
-
-// Fetch weather from API
+// 1. Weather (실제 로직 유지)
 async function fetchWeather() {
   try {
-    const response = await fetch(API_CONFIG.weather);
-    if (!response.ok) throw new Error('Weather API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Weather API error:', error);
-    // Return sample data as fallback
+    // notifications.js가 먼저 로드되었는지 확인
+    if (typeof WidgetAPIs === 'undefined') {
+        console.warn('WidgetAPIs not found');
+        throw new Error('API not loaded');
+    }
+
+    const data = await WidgetAPIs.getWeather();
+    if (!data) throw new Error('Weather API failed');
+
+    const temp = Math.round(data.temperature);
+    const humid = data.humidity;
+    const code = data.weatherCode;
+    // const lat = data.locationInfo.lat;
+    // const lon = data.locationInfo.lon;
+
     return [
       {
-        id: 'weather',
+        id: 'weather-real',
         type: 'weather',
-        icon: '🌤️',
-        title: '제주특별자치 아라동',
-        temp: '3°',
-        tempRange: '최고 5° 최저 -1°'
+        icon: getWeatherIcon(code),
+        title: '현재 위치 날씨', // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
+        temp: `${temp}°C`,
+        tempRange: `습도: ${humid}%`
+      }
+    ];
+  } catch (error) {
+    console.error('Weather load error:', error);
+    // 실패 시 보여줄 기본값
+    return [
+      {
+        id: 'weather-fallback',
+        type: 'weather',
+        icon: '🌦️',
+        title: '날씨 정보 없음',
+        temp: '-',
+        tempRange: '로딩 실패'
       }
     ];
   }
 }
 
-// Fetch stocks from API
+// 2. Notifications (Dummy)
+async function fetchNotifications() {
+  return [
+    {
+      id: 'github',
+      type: 'notification',
+      icon: '🐙',
+      title: 'GitHub',
+      subtitle: 'New Pull Request !wantoshome!',
+      time: '3일 전'
+    },
+    {
+      id: 'gmail',
+      type: 'notification',
+      icon: '✉️',
+      title: 'Gmail',
+      subtitle: 'Google서비스에서 [편 밀림 알림]',
+      time: '3시간 전'
+    }
+  ];
+}
+
+// 3. Stocks (Dummy)
 async function fetchStocks() {
-  try {
-    const response = await fetch(API_CONFIG.stocks);
-    if (!response.ok) throw new Error('Stocks API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Stocks API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'kakao',
-        type: 'stock',
-        icon: '📈',
-        title: '카카오',
-        price: '60,900',
-        change: '△700',
-        hasChart: true
-      }
-    ];
-  }
+  return [
+    {
+      id: 'kakao',
+      type: 'stock',
+      icon: '📈',
+      title: '카카오',
+      price: '60,900',
+      change: '△700',
+      hasChart: true
+    },
+    {
+      id: 'samsung',
+      type: 'stock',
+      icon: '📉',
+      title: '삼성전자',
+      price: '72,100',
+      change: '▼500',
+      hasChart: false
+    }
+  ];
 }
 
-// Fetch messages from API
+// 4. Messages (Dummy)
 async function fetchMessages() {
-  try {
-    const response = await fetch(API_CONFIG.messages);
-    if (!response.ok) throw new Error('Messages API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Messages API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'message',
-        type: 'message',
-        icon: '💬',
-        text: '좋은 아침입니다. WooRyeong!',
-        sender: '프로필'
-      }
-    ];
-  }
+  return [
+    {
+      id: 'message',
+      type: 'message',
+      icon: '💬',
+      text: '좋은 아침입니다. WooRyeong!',
+      sender: '프로필'
+    }
+  ];
 }
 
-// Fetch videos from API
+// 5. Videos (Dummy)
 async function fetchVideos() {
-  try {
-    const response = await fetch(API_CONFIG.videos);
-    if (!response.ok) throw new Error('Videos API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Videos API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'youtube',
-        type: 'video',
-        icon: '▶️',
-        title: '[무한도전] 사냥꾼',
-        thumbnail: 'https://via.placeholder.com/100x100?text=Video'
-      }
-    ];
-  }
+  return [
+    {
+      id: 'youtube',
+      type: 'video',
+      icon: '▶️',
+      title: '[무한도전] 사냥꾼',
+      thumbnail: 'https://via.placeholder.com/300x160/000000/FFFFFF?text=YouTube+Video'
+    }
+  ];
 }
 
-// Fetch images from API
+// 6. Images (Dummy)
 async function fetchImages() {
-  try {
-    const response = await fetch(API_CONFIG.images);
-    if (!response.ok) throw new Error('Images API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Images API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'cat',
-        type: 'image',
-        icon: '🐱',
-        imageUrl: 'https://api.thecatapi.com/v1/images/search'
-      }
-    ];
-  }
+  return [
+    {
+      id: 'cat',
+      type: 'image',
+      icon: '🐱',
+      imageUrl: 'https://via.placeholder.com/300x200?text=Random+Image'
+    }
+  ];
 }
 
+/**
+ * Event Listeners & Helpers
+ */
 function setupTabNavigation() {
   const settingBtn = document.getElementById('setting');
   const settingsModal = document.getElementById('settingsModal');
   const closeBtn = document.getElementById('closeSettings');
 
-  // Open settings modal
   if (settingBtn) {
     settingBtn.addEventListener('click', () => {
       settingsModal.classList.add('active');
     });
   }
 
-  // Close settings modal
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       settingsModal.classList.remove('active');
     });
   }
 
-  // Close modal when clicking outside
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) {
@@ -414,7 +397,6 @@ function setupTabNavigation() {
     });
   }
 
-  // Handle widget toggles
   const toggles = {
     'toggle-notifications': 'notifications',
     'toggle-weather': 'weather',
@@ -429,30 +411,24 @@ function setupTabNavigation() {
     if (element) {
       element.addEventListener('change', (e) => {
         sidebarState.widgetSettings[settingKey] = e.target.checked;
-        
-        // Save to storage
-        chrome.storage.sync.set({ widgetSettings: sidebarState.widgetSettings });
-        
-        // Reload feed
+        if(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            chrome.storage.sync.set({ widgetSettings: sidebarState.widgetSettings });
+        }
         loadFeed();
       });
     }
   });
 }
 
-/**
- * Helper: Get widget title
- */
-function getWidgetTitle(type) {
-  const titles = {
-    weather: '날씨',
-    stocks: '주식',
-    clock: '시계',
-    todo: '할 일',
-    random_image: '이미지',
-    media_control: '미디어 제어',
-  };
-  return titles[type] || type;
+function getWeatherIcon(code) {
+  if (code === 0) return '☀️'; 
+  if (code <= 3) return '⛅'; 
+  if (code <= 48) return '🌫️'; 
+  if (code <= 67) return '🌧️'; 
+  if (code <= 77) return '🌨️'; 
+  if (code <= 82) return '🌧️'; 
+  if (code <= 99) return '⛈️'; 
+  return '❓';
 }
 
 // Initialize sidebar when DOM is ready
