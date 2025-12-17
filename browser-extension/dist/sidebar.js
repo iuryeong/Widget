@@ -175,6 +175,7 @@ function renderFeedItem(item) {
           <div class="card-time">${item.time}</div>
         </div>
       `;
+
     case 'weather':
       return `
         <div class="feed-card weather-card">
@@ -186,7 +187,27 @@ function renderFeedItem(item) {
           <p class="weather-range">${item.tempRange}</p>
         </div>
       `;
+
     case 'stock':
+      const colorStyle = item.changeColor 
+        ? `color: ${item.changeColor}` 
+        : `color:${item.change.includes('▲') || item.change.includes('△') ? '#d32f2f' : '#1976d2'}`;
+
+      // [핵심 로직] 개장 전이면 텍스트, 아니면 이미지
+      let chartArea = '';
+      if (item.isPreMarket) {
+        chartArea = `
+          <div style="height: 40px; background: #f8f9fa; border-radius: 4px; margin-top: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #888;">
+            😴 개장 전입니다 (09:00 오픈)
+          </div>`;
+      } else {
+        // 네이버 차트 이미지를 꽉 차게 보여줍니다.
+        chartArea = `
+          <div style="margin-top: 8px; text-align: center;">
+            <img src="${item.chartUrl}?t=${new Date().getTime()}" alt="차트" style="width: 100%; height: auto; border-radius: 4px;" />
+          </div>`;
+      }
+
       return `
         <div class="feed-card stock-card">
           <div class="stock-header">
@@ -195,11 +216,12 @@ function renderFeedItem(item) {
           </div>
           <div class="stock-price">
             <span class="price">${item.price}</span>
-            <span class="change" style="color:${item.change.includes('▲')||item.change.includes('△')?'#d32f2f':'#1976d2'}">${item.change}</span>
+            <span class="change" style="${colorStyle}">${item.change}</span>
           </div>
-          ${item.hasChart ? '<div class="stock-chart" style="height: 40px; background: #f0f0f0; border-radius: 4px; margin-top:8px;"></div>' : ''}
+          ${chartArea}
         </div>
       `;
+
     case 'image':
       return `
         <div class="feed-card image-card">
@@ -216,6 +238,7 @@ function renderFeedItem(item) {
           <p class="sender" style="font-size:12px; color:#888; margin-top:5px;">${item.sender}</p>
         </div>
       `;
+      
     case 'video':
       return `
         <div class="feed-card video-card">
@@ -307,28 +330,69 @@ async function fetchNotifications() {
   ];
 }
 
-// 3. Stocks (Dummy)
+// 3. Stocks
 async function fetchStocks() {
+  try {
+    const now = new Date();
+    const hours = now.getHours();
+
+    const isPreMarket = hours < 9;
+    
+    const response = await fetch('https://finance.naver.com/item/main.naver?code=035720');
+    const buffer = await response.arrayBuffer();
+    const decoder = new TextDecoder('euc-kr');
+    const html = decoder.decode(buffer);
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const priceElement = doc.querySelector('.no_today .blind');
+    const price = priceElement ? priceElement.innerText : '-';
+
+    const marketInfo = doc.querySelector('.no_exday');
+    let changeAmount = '0';
+    let changeSymbol = ''; // ▲ 또는 ▼
+    let changeColor = '#333'; // 기본 검정
+    
+    if (marketInfo) {
+      // 변동 가격 추출
+      const blinds = marketInfo.querySelectorAll('.blind');
+      if (blinds.length > 0) changeAmount = blinds[0].innerText;
+
+      // 상승/하락 여부 판단 (클래스명으로 확인)
+      const htmlContent = marketInfo.innerHTML;
+      if (htmlContent.includes('ico_up')) {
+        changeSymbol = '▲';
+        changeColor = '#d32f2f'; // 빨강 (상승)
+      } else if (htmlContent.includes('ico_down')) {
+        changeSymbol = '▼';
+        changeColor = '#1976d2'; // 파랑 (하락)
+      }
+    }
+
   return [
     {
       id: 'kakao',
       type: 'stock',
       icon: '📈',
       title: '카카오',
-      price: '60,900',
-      change: '△700',
-      hasChart: true
+      price: `${price}원`,
+      change: `${changeSymbol} ${changeAmount}`,
+      changeColor: changeColor,
+      isPreMarket: isPreMarket,
+      chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/mobile/mini/035720.png' 
     },
-    {
-      id: 'samsung',
-      type: 'stock',
-      icon: '📉',
-      title: '삼성전자',
-      price: '72,100',
-      change: '▼500',
-      hasChart: false
-    }
   ];
+} catch (error) {
+    console.error('Stock fetch error:', error);
+    return [
+      {
+        id: 'kakao-fail', type: 'stock', icon: '⚠️', title: '카카오',
+      price: '-', change: '로딩 실패', changeColor: '#999',
+      isPreMarket: false, chartUrl: ''
+      },
+    ];
+  } 
 }
 
 // 4. Messages (Dummy)
