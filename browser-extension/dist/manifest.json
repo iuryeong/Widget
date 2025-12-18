@@ -7,7 +7,11 @@
     "storage",
     "sidePanel",
     "tabs",
-    "scripting"
+    "scripting",
+    "webRequest",
+    "windows",
+    "sidePanel",
+    "geolocation"
   ],
   "host_permissions": [
     "https://*/*",

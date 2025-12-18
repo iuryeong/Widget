@@ -157,9 +157,7 @@ async function loadFeed() {
   }
 }
 
-/**
- * Render individual feed item
- */
+
 function renderFeedItem(item) {
   switch (item.type) {
     case 'notification':
@@ -258,36 +256,63 @@ function renderFeedItem(item) {
  * =================================================
  */
 
-// 1. Weather
-async function fetchWeather() {
-  try {
-    if (typeof WidgetAPIs === 'undefined') {
-        console.warn('WidgetAPIs not found');
-        throw new Error('API not loaded');
+async function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not supported');
+      resolve({ lat: 37.5665, lon: 126.9780 }); // 기본값: 서울
+      return;
     }
 
-    const data = await WidgetAPIs.getWeather();
-    if (!data) throw new Error('Weather API failed');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude
+        });
+      },
+      (error) => {
+        console.warn('Geolocation error:', error);
+        resolve({ lat: 37.5665, lon: 126.9780 }); // 실패 시 기본값
+      }
+    );
+  });
+}
 
-    const temp = Math.round(data.temperature);
-    const humid = data.humidity;
-    const code = data.weatherCode;
-    // const lat = data.locationInfo.lat;
-    // const lon = data.locationInfo.lon;
+async function fetchWeather() {
+  try {
+    const API_KEY = '55c2cbe5b7be23a8b79d69256be48566';
+    
+    const location = await getCurrentLocation();
+    const lat = location.lat;
+    const lon = location.lon;
+    
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=ko`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('OpenWeatherMap API failed');
+    
+    const data = await response.json();
+    
+    const temp = Math.round(data.main.temp);
+    const tempMin = Math.round(data.main.temp_min);
+    const tempMax = Math.round(data.main.temp_max);
+    const humidity = data.main.humidity;
+    const weatherCode = data.weather[0].main;
+    const locationName = data.name;
 
     return [
       {
         id: 'weather-real',
         type: 'weather',
-        icon: getWeatherIcon(code),
-        title: '현재 위치 날씨', // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
+        icon: getWeatherIcon(weatherCode),
+        title: `현재 위치 날씨 (${locationName})`, // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
         temp: `${temp}°C`,
-        tempRange: `습도: ${humid}%`
+        tempRange: `최고 ${tempMax}° / 최저 ${tempMin}° (습도: ${humidity}%)`
       }
     ];
   } catch (error) {
     console.error('Weather load error:', error);
-    // 실패 시 보여줄 기본값
     return [
       {
         id: 'weather-fallback',
@@ -298,6 +323,34 @@ async function fetchWeather() {
         tempRange: '로딩 실패'
       }
     ];
+  }
+}
+
+function getWeatherIcon(weatherCode) {
+  switch (weatherCode) {
+    case 'Clear':
+      return '☀️';
+    case 'Clouds':
+      return '☁️';
+    case 'Rain':
+    case 'Drizzle':
+      return '🌧️';
+    case 'Thunderstorm':
+      return '⛈️';
+    case 'Snow':
+      return '❄️';
+    case 'Mist':
+    case 'Smoke':
+    case 'Haze':
+    case 'Dust':
+    case 'Fog':
+    case 'Sand':
+    case 'Ash':
+    case 'Squall':
+    case 'Tornado':
+      return '🌫️';
+    default:
+      return '🌡️';
   }
 }
 
@@ -533,17 +586,6 @@ function setupTabNavigation() {
       }
     });
   }
-}
-
-function getWeatherIcon(code) {
-  if (code === 0) return '☀️'; 
-  if (code <= 3) return '⛅'; 
-  if (code <= 48) return '🌫️'; 
-  if (code <= 67) return '🌧️'; 
-  if (code <= 77) return '🌨️'; 
-  if (code <= 82) return '🌧️'; 
-  if (code <= 99) return '⛈️'; 
-  return '❓';
 }
 
 // Initialize sidebar when DOM is ready

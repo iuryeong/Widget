@@ -9,7 +9,8 @@
     "activeTab",
     "scripting",
     "webRequest",
-    "sidePanel"
+    "sidePanel",
+    "geolocation"
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
