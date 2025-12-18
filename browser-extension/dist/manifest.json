@@ -9,7 +9,8 @@
     "tabs",
     "activeTab",
     "scripting",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "geolocation"
   ],
   "host_permissions": [
     "https://*/*",

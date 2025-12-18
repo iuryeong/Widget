@@ -298,31 +298,59 @@ function renderFeedItem(item) {
  * =================================================
  */
 
-// 1. Weather
-async function fetchWeather() {
-  try {
-    if (typeof WidgetAPIs === 'undefined') {
-        console.warn('WidgetAPIs not found');
-        throw new Error('API not loaded');
+async function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not supported');
+      resolve({ lat: 37.5665, lon: 126.9780 }); // 기본값: 서울
+      return;
     }
 
-    const data = await WidgetAPIs.getWeather();
-    if (!data) throw new Error('Weather API failed');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude
+        });
+      },
+      (error) => {
+        console.warn('Geolocation error:', error);
+        resolve({ lat: 37.5665, lon: 126.9780 }); // 실패 시 기본값
+      }
+    );
+  });
+}
 
-    const temp = Math.round(data.temperature);
-    const humid = data.humidity;
-    const code = data.weatherCode;
-    // const lat = data.locationInfo.lat;
-    // const lon = data.locationInfo.lon;
+async function fetchWeather() {
+  try {
+    const API_KEY = '55c2cbe5b7be23a8b79d69256be48566';
+    
+    const location = await getCurrentLocation();
+    const lat = location.lat;
+    const lon = location.lon;
+    
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=ko`;
+    
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('OpenWeatherMap API failed');
+    
+    const data = await response.json();
+    
+    const temp = Math.round(data.main.temp);
+    const tempMin = Math.round(data.main.temp_min);
+    const tempMax = Math.round(data.main.temp_max);
+    const humidity = data.main.humidity;
+    const weatherCode = data.weather[0].main;
+    const locationName = data.name;
 
     return [
       {
         id: 'weather-real',
         type: 'weather',
-        icon: getWeatherIcon(code),
-        title: '현재 위치 날씨', // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
+        icon: getWeatherIcon(weatherCode),
+        title: `현재 위치 날씨 (${locationName})`, // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
         temp: `${temp}°C`,
-        tempRange: `습도: ${humid}%`
+        tempRange: `최고 ${tempMax}° / 최저 ${tempMin}° (습도: ${humidity}%)`
       }
     ];
   } catch (error) {
@@ -337,6 +365,34 @@ async function fetchWeather() {
         tempRange: '로딩 실패'
       }
     ];
+  }
+}
+
+function getWeatherIcon(weatherCode) {
+  switch (weatherCode) {
+    case 'Clear':
+      return '☀️';
+    case 'Clouds':
+      return '☁️';
+    case 'Rain':
+    case 'Drizzle':
+      return '🌧️';
+    case 'Thunderstorm':
+      return '⛈️';
+    case 'Snow':
+      return '❄️';
+    case 'Mist':
+    case 'Smoke':
+    case 'Haze':
+    case 'Dust':
+    case 'Fog':
+    case 'Sand':
+    case 'Ash':
+    case 'Squall':
+    case 'Tornado':
+      return '🌫️';
+    default:
+      return '🌡️';
   }
 }
 
@@ -362,14 +418,15 @@ async function fetchNotifications() {
   ];
 }
 
-// 3. Stocks
+// 3. Stocks - 급등주 TOP 5
 async function fetchStocks() {
   try {
     const now = new Date();
     const hours = now.getHours();
-    const isPreMarket = hours < 9;
+    const isPreMarket = hours < 9 || hours >= 16;
     
-    const response = await fetch('https://finance.naver.com/item/main.naver?code=035720');
+    // 네이버 금융 급등주 페이지
+    const response = await fetch('https://finance.naver.com/sise/sise_rise.naver');
     const buffer = await response.arrayBuffer();
     const decoder = new TextDecoder('euc-kr');
     const html = decoder.decode(buffer);
@@ -377,61 +434,94 @@ async function fetchStocks() {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    const priceElement = doc.querySelector('.no_today .blind');
-    const price = priceElement ? priceElement.innerText : '-';
-
-    const marketInfo = doc.querySelector('.no_exday');
-    let changeAmount = '0';
-    let changeSymbol = ''; 
-    let changeColor = '#333'; // 기본 검정
+    // 급등주 리스트 가져오기 (상위 3개만)
+    const stockRows = doc.querySelectorAll('.type_2 tbody tr');
+    const stocks = [];
     
-    if (marketInfo) {
-      const htmlContent = marketInfo.innerHTML;
+    for (let i = 0; i < Math.min(3, stockRows.length); i++) {
+      const row = stockRows[i];
       
-      if (htmlContent.includes('no_up') || htmlContent.includes('ico_up')) {
-        changeSymbol = '▲';
-        changeColor = '#d32f2f'; // 빨강
-      } else if (htmlContent.includes('no_down') || htmlContent.includes('ico_down')) {
-        changeSymbol = '▼';
-        changeColor = '#1976d2'; // 파랑
-      } else {
-        changeSymbol = '-';
-        changeColor = '#333';
-      }
-      const blinds = marketInfo.querySelectorAll('.blind');
-
-      for (let span of blinds) {
+      // 빈 행 건너뛰기
+      if (!row.querySelector('.tltle')) continue;
+      
+      const nameElement = row.querySelector('.tltle');
+      const priceElement = row.querySelectorAll('td')[2];
+      const changeElements = row.querySelectorAll('td span');
+      
+      if (!nameElement || !priceElement) continue;
+      
+      const name = nameElement.innerText.trim();
+      const price = priceElement.innerText.trim();
+      
+      // 등락률 찾기
+      let changePercent = '0%';
+      let changeColor = '#333';
+      let changeSymbol = '';
+      
+      for (let span of changeElements) {
+        const className = span.className;
         const text = span.innerText.trim();
-        if (/^[0-9,]+$/.test(text)) {
-           changeAmount = text;
-           break;
+        
+        if (className.includes('tah p11')) {
+          if (className.includes('nv01')) {
+            changeSymbol = '▲';
+            changeColor = '#d32f2f';
+          } else if (className.includes('nv02')) {
+            changeSymbol = '▼';
+            changeColor = '#1976d2';
+          }
+          
+          if (text.includes('%')) {
+            changePercent = text;
+            break;
+          }
         }
       }
+      
+      // 종목 코드 추출 (링크에서)
+      const link = nameElement.getAttribute('href');
+      const codeMatch = link ? link.match(/code=(\d+)/) : null;
+      const stockCode = codeMatch ? codeMatch[1] : '000000';
+      
+      stocks.push({
+        id: `stock-${stockCode}`,
+        type: 'stock',
+        icon: '🔥',
+        title: name,
+        price: `${price}원`,
+        change: `${changeSymbol} ${changePercent}`,
+        changeColor: changeColor,
+        isPreMarket: isPreMarket,
+        chartUrl: `https://ssl.pstatic.net/imgfinance/chart/mobile/mini/${stockCode}.png`
+      });
+      
+      // 최대 3개까지만
+      if (stocks.length >= 3) break;
     }
+    
+    // 데이터가 없으면 폴백
+    if (stocks.length === 0) {
+      throw new Error('No stock data found');
+    }
+    
+    return stocks;
 
-  return [
-    {
-      id: 'kakao',
-      type: 'stock',
-      icon: '📈',
-      title: '카카오',
-      price: `${price}원`,
-      change: `${changeSymbol} ${changeAmount}`,
-      changeColor: changeColor,
-      isPreMarket: isPreMarket,
-      chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/mobile/mini/035720.png' 
-    },
-  ];
-} catch (error) {
+  } catch (error) {
     console.error('Stock fetch error:', error);
     return [
       {
-        id: 'kakao-fail', type: 'stock', icon: '⚠️', title: '카카오',
-      price: '-', change: '로딩 실패', changeColor: '#999',
-      isPreMarket: false, chartUrl: ''
-      },
+        id: 'stock-fail',
+        type: 'stock',
+        icon: '⚠️',
+        title: '급등주 정보',
+        price: '-',
+        change: '로딩 실패',
+        changeColor: '#999',
+        isPreMarket: false,
+        chartUrl: ''
+      }
     ];
-  } 
+  }
 }
 
 // 4. Messages
@@ -628,16 +718,6 @@ function setupTabNavigation() {
   }
 }
 
-function getWeatherIcon(code) {
-  if (code === 0) return '☀️'; 
-  if (code <= 3) return '⛅'; 
-  if (code <= 48) return '🌫️'; 
-  if (code <= 67) return '🌧️'; 
-  if (code <= 77) return '🌨️'; 
-  if (code <= 82) return '🌧️'; 
-  if (code <= 99) return '⛈️'; 
-  return '❓';
-}
 
 // Initialize sidebar when DOM is ready
 if (document.readyState === 'loading') {
