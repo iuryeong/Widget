@@ -7,12 +7,21 @@
     "storage",
     "sidePanel",
     "tabs",
-    "scripting"
+    "activeTab",
+    "scripting",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "https://*/*",
     "http://*/*"
   ],
+  "declarative_net_request": {
+    "rule_resources": [{
+      "id": "ruleset_1",
+      "enabled": true,
+      "path": "rules.json"
+    }]
+  },
   "action": {
     "default_title": "Open Widget Side Panel"
   },
@@ -25,18 +34,18 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["https://www.youtube.com/*"],
       "js": ["main.js"],
-      "run_at": "document_start"
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/api/*.js"],
+      "resources": ["notifications.js"],
       "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-   "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https:; img-src 'self' https: data:;"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https:; img-src 'self' https: data:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; media-src 'self' https:;"
   }
 }
