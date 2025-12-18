@@ -253,20 +253,27 @@ function renderFeedItem(item) {
       `;
       
     case 'video':
-      let embedUrl = `https://www.youtube.com/embed/${item.videoId}`;
-      
-      if (item.listId) {
-        embedUrl += `?list=${item.listId}`;
-      }
+      const embedUrl = `https://www.youtube.com/embed/${item.videoId}`;
 
       return `
-        <div class="feed-card video-card" style="padding: 10px;">
-          <div class="video-header" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-            <span class="card-icon">${item.icon}</span>
-            <h4 style="font-size: 13px; font-weight: 600; margin: 0;">${item.title}</h4>
+        <div class="feed-card video-card" style="padding: 12px;">
+          <div class="video-header" style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-icon">${item.icon}</span>
+              <h4 style="font-size: 13px; font-weight: 600; margin: 0;">YouTube Player</h4>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+            <input type="text" id="youtubeUrlInput" placeholder="유튜브 링크 붙여넣기..." 
+              style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; outline: none;">
+            <button id="changeVideoBtn" 
+              style="padding: 6px 10px; background: #ff0000; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">
+              재생
+            </button>
           </div>
           
-          <div class="video-player" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px;">
+          <div class="video-player" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
             <iframe 
               src="${embedUrl}" 
               style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
@@ -645,31 +652,22 @@ async function fetchMessages() {
 
 // 5. Videos
 async function fetchVideos() {
-  const VIDEO_ID = 'M7lc1UVf-VE';
-  const LIST_ID = null;
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['userVideoId'], (result) => {
+      const videoId = result.userVideoId || 'M7lc1UVf-VE';
 
-  let videoTitle = 'official test';
-
-  try {
-    const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${VIDEO_ID}&format=json`);
-    if (response.ok) {
-      const data = await response.json();
-      videoTitle = data.title;
-    }
-  } catch (error) {
-    console.warn('제목 로딩 실패');
-  }
-
-  return [
-    {
-      id: 'youtube',
-      type: 'video',
-      icon: '▶️',
-      title: videoTitle,
-      videoId: VIDEO_ID,
-      listId : LIST_ID
-    }
-  ];
+      resolve([
+        {
+          id: 'youtube',
+          type: 'video',
+          icon: '▶️',
+          title: 'youtube',
+          videoId: videoId,
+          listId: null
+        }
+      ]);
+    });
+  });
 }
 
 // 6. Images
@@ -837,6 +835,29 @@ function setupTabNavigation() {
     feedContainer.addEventListener('click', async (e) => {
       if (e.target.id === 'addTodoBtn') {
         addTodo();
+      }
+
+      if (e.target.id === 'changeVideoBtn') {
+        const input = document.getElementById('youtubeUrlInput');
+        const url = input.value.trim();
+
+        if (!url) return;
+
+        // URL에서 Video ID 추출하기 (정규식 마법)
+        // 지원 형식: youtube.com/watch?v=ID, youtu.be/ID, embed/ID 등
+        const videoIdMatch = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11}).*/);
+        
+        if (videoIdMatch && videoIdMatch[1]) {
+          const newVideoId = videoIdMatch[1];
+          
+          // ID 저장 후 새로고침
+          await chrome.storage.sync.set({ userVideoId: newVideoId });
+          console.log('새 영상 ID 저장됨:', newVideoId);
+          loadFeed(); // 화면 갱신해서 바로 영상 보여주기
+          
+        } else {
+          alert('올바른 유튜브 링크가 아닙니다.\n(예: https://youtu.be/... 또는 https://www.youtube.com/watch?v=...)');
+        }
       }
 
       if (e.target.classList.contains('todo-delete')) {
