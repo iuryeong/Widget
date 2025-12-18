@@ -127,6 +127,7 @@ async function loadFeed() {
     const results = await Promise.all([
       sidebarState.widgetSettings.notifications ? fetchNotifications() : Promise.resolve([]),
       (sidebarState.widgetSettings.memo !== false) ? fetchMemo() : Promise.resolve([]),
+      (sidebarState.widgetSettings.todo !== false) ? fetchTodo() : Promise.resolve([]),
       sidebarState.widgetSettings.weather ? fetchWeather() : Promise.resolve([]),
       sidebarState.widgetSettings.stocks ? fetchStocks() : Promise.resolve([]),
       sidebarState.widgetSettings.videos ? fetchVideos() : Promise.resolve([]),
@@ -287,6 +288,37 @@ function renderFeedItem(item) {
             ">${item.text}</textarea>
         </div>
       `;
+case 'todo':
+      // 할 일 목록 HTML 생성
+      const todoListHtml = item.items.map(todo => `
+        <div class="todo-item" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <input type="checkbox" class="todo-check" data-id="${todo.id}" ${todo.done ? 'checked' : ''} style="cursor: pointer;">
+          
+          <input type="text" class="todo-text" data-id="${todo.id}" value="${todo.text}" 
+            style="flex: 1; border: none; border-bottom: 1px solid #eee; padding: 4px; outline: none; font-size: 13px; color: ${todo.done ? '#aaa' : '#333'}; text-decoration: ${todo.done ? 'line-through' : 'none'}; background: transparent;">
+          
+          <button class="todo-delete" data-id="${todo.id}" style="border: none; background: none; cursor: pointer; color: #ff6b6b; font-size: 14px;">✕</button>
+        </div>
+      `).join('');
+
+      return `
+      <div class="feed-card todo-card" style="padding: 12px;">
+          <div class="todo-header" style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-icon">${item.icon}</span>
+              <h4 style="font-size: 13px; font-weight: 600; margin: 0;">할 일 목록</h4>
+            </div>
+          </div>
+          
+          <div id="todoListArea">${todoListHtml}</div>
+
+          <div style="display: flex; gap: 5px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+            <input type="text" id="newTodoInput" placeholder="할 일 입력" style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+            <button id="addTodoBtn" style="padding: 6px 12px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">추가</button>
+          </div>
+        </div>
+      `;
+
     default:
       return '';
   }
@@ -618,6 +650,25 @@ async function fetchMemo() {
   });
 }
 
+//8. Todo list
+async function fetchTodo() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['userTodos'], (result) => {
+      // 저장된 할 일이 없으면 빈 배열 []
+      const todos = result.userTodos || [];
+      
+      resolve([
+        {
+          id: 'my-todo',
+          type: 'todo',
+          icon: '✅',
+          items: todos // 배열 데이터를 넘겨줌
+        }
+      ]);
+    });
+  });
+}
+
 /**
  * Event Listeners & Helpers
  */
@@ -648,22 +699,108 @@ function setupTabNavigation() {
   }
 
   if (feedContainer) {
-    let timeoutId; // 디바운싱(Debouncing)용 변수
+    let memoTimeoutId;
+    let todoTimeoutId;
 
     feedContainer.addEventListener('input', (e) => {
-      // 이벤트가 발생한 요소가 메모장 인풋인지 확인
-      if (e.target && e.target.id === 'memoInput') {
+      // 1. 메모장 자동 저장
+      if (e.target.id === 'memoInput') {
         const text = e.target.value;
+        clearTimeout(memoTimeoutId);
+        memoTimeoutId = setTimeout(() => {
+          chrome.storage.sync.set({ userMemo: text }, () => console.log('메모 저장됨'));
+        }, 500);
+      }
 
-        // 1. 타이핑 할 때마다 즉시 저장하면 성능에 안 좋으니, 
-        //    타이핑이 멈추고 0.5초 뒤에 저장하도록 처리 (디바운싱)
-        clearTimeout(timeoutId);
-        
-        timeoutId = setTimeout(() => {
-          chrome.storage.sync.set({ userMemo: text }, () => {
-            console.log('메모 저장됨:', text);
+      // 2. [추가됨] 투두리스트 내용 수정 (실시간 저장)
+      if (e.target.classList.contains('todo-text')) {
+        const idToEdit = Number(e.target.dataset.id);
+        const newText = e.target.value;
+
+        clearTimeout(todoTimeoutId);
+        todoTimeoutId = setTimeout(async () => {
+          const { userTodos = [] } = await chrome.storage.sync.get(['userTodos']);
+          const updatedTodos = userTodos.map(todo => {
+            if (todo.id === idToEdit) return { ...todo, text: newText };
+            return todo;
           });
-        }, 500); // 0.5초 딜레이
+          await chrome.storage.sync.set({ userTodos: updatedTodos });
+          console.log('투두 수정됨');
+        }, 500);
+      }
+    });
+
+    // --- [B] 클릭 이벤트 (투두 추가/삭제/체크 + 이미지 새로고침) ---
+    
+    // (헬퍼 함수) 투두 추가 로직
+    const addTodo = async () => {
+      const input = document.getElementById('newTodoInput');
+      if (!input || !input.value.trim()) return;
+
+      const newText = input.value.trim();
+      const newTodo = { id: Date.now(), text: newText, done: false };
+
+      const { userTodos = [] } = await chrome.storage.sync.get(['userTodos']);
+      const updatedTodos = [...userTodos, newTodo];
+      
+      await chrome.storage.sync.set({ userTodos: updatedTodos });
+      loadFeed(); // 화면 갱신
+    };
+
+    feedContainer.addEventListener('click', async (e) => {
+      if (e.target.id === 'addTodoBtn') {
+        addTodo();
+      }
+
+      if (e.target.classList.contains('todo-delete')) {
+        const idToDelete = Number(e.target.dataset.id);
+        const { userTodos = [] } = await chrome.storage.sync.get(['userTodos']);
+        const updatedTodos = userTodos.filter(todo => todo.id !== idToDelete);
+        
+        await chrome.storage.sync.set({ userTodos: updatedTodos });
+        loadFeed();
+      }
+
+      if (e.target.classList.contains('todo-check')) {
+        const idToToggle = Number(e.target.dataset.id);
+        const { userTodos = [] } = await chrome.storage.sync.get(['userTodos']);
+        
+        const updatedTodos = userTodos.map(todo => {
+          if (todo.id === idToToggle) return { ...todo, done: e.target.checked };
+          return todo;
+        });
+
+        const textInput = e.target.nextElementSibling;
+        if (textInput) {
+          textInput.style.textDecoration = e.target.checked ? 'line-through' : 'none';
+          textInput.style.color = e.target.checked ? '#aaa' : '#333';
+        }
+        
+        await chrome.storage.sync.set({ userTodos: updatedTodos });
+      }
+
+      const imageCard = e.target.closest('.image-card');
+      if (imageCard) {
+        const imgElement = imageCard.querySelector('img');
+        if (imgElement) imgElement.style.opacity = '0.5';
+        const newImages = await fetchImages();
+        if (newImages && newImages.length > 0 && imgElement) {
+          const newSrc = newImages[0].imageUrl;
+          const tempImg = new Image();
+          tempImg.src = newSrc;
+          tempImg.onload = () => {
+            imgElement.src = newSrc;
+            imgElement.style.opacity = '1';
+          };
+        } else {
+            imgElement.style.opacity = '1';
+        }
+      }
+    });
+
+    feedContainer.addEventListener('keydown', (e) => {
+      if (e.target.id === 'newTodoInput' && e.key === 'Enter') {
+        addTodo();
       }
     });
   }
@@ -689,33 +826,6 @@ function setupTabNavigation() {
       });
     }
   });
-  if (feedContainer) {
-    feedContainer.addEventListener('click', async (e) => {
-      // 클릭된 요소가 .image-card 내부인지 확인
-      const imageCard = e.target.closest('.image-card');
-      
-      if (imageCard) {
-        const imgElement = imageCard.querySelector('img');
-        
-        if (imgElement) imgElement.style.opacity = '0.5';
-
-        const newImages = await fetchImages();
-        
-        if (newImages && newImages.length > 0 && imgElement) {
-          const newSrc = newImages[0].imageUrl;
-          const tempImg = new Image();
-          tempImg.src = newSrc;
-          
-          tempImg.onload = () => {
-            imgElement.src = newSrc;
-            imgElement.style.opacity = '1'; // 다시 선명하게
-          };
-        } else {
-            imgElement.style.opacity = '1';
-        }
-      }
-    });
-  }
 }
 
 
