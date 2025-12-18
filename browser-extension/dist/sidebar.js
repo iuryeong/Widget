@@ -1,7 +1,5 @@
 /**
  * Sidebar UI Controller
- * - 날씨: 실제 API 사용 (WidgetAPIs)
- * - 나머지: 테스트용 더미 데이터 사용
  */
 
 console.log('[Widget] Sidebar loaded');
@@ -65,7 +63,11 @@ function renderSidebar() {
     <div class="sidebar-container">
       <div class="sidebar-header">
         <span class="header-date">${dateStr}</span>
-        <button id="setting" class="setting-btn">⚙️</button>
+        
+        <div style="display: flex; gap: 8px;">
+          
+          <button id="setting" class="setting-btn" title="위젯 설정">⚙️</button>
+        </div>
       </div>
 
       <div class="sidebar-content">
@@ -234,14 +236,27 @@ function renderFeedItem(item) {
       `;
       
     case 'video':
+      let embedUrl = `https://www.youtube.com/embed/${item.videoId}`;
+      
+      if (item.listId) {
+        embedUrl += `?list=${item.listId}`;
+      }
+
       return `
-        <div class="feed-card video-card">
-          <div class="video-header">
+        <div class="feed-card video-card" style="padding: 10px;">
+          <div class="video-header" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
             <span class="card-icon">${item.icon}</span>
-            <h4>${item.title}</h4>
+            <h4 style="font-size: 13px; font-weight: 600; margin: 0;">${item.title}</h4>
           </div>
-          <div class="video-thumbnail" style="margin-top:8px;">
-            <img src="${item.thumbnail}" alt="Video" style="width:100%; border-radius:8px;" />
+          
+          <div class="video-player" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px;">
+            <iframe 
+              src="${embedUrl}" 
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;" 
+              frameborder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowfullscreen>
+            </iframe>
           </div>
         </div>
       `;
@@ -253,8 +268,6 @@ function renderFeedItem(item) {
 /**
  * =================================================
  * API Fetch Functions
- * 날씨: 실제 데이터 사용 (WidgetAPIs)
- * 나머지: 더미 데이터 사용 (에러 방지)
  * =================================================
  */
 
@@ -287,7 +300,6 @@ async function fetchWeather() {
     ];
   } catch (error) {
     console.error('Weather load error:', error);
-    // 실패 시 보여줄 기본값
     return [
       {
         id: 'weather-fallback',
@@ -363,10 +375,9 @@ async function fetchStocks() {
 
       for (let span of blinds) {
         const text = span.innerText.trim();
-        // 콤마(,)와 숫자만 있는 문자열을 찾음 (퍼센트% 나 글자가 섞인 건 무시)
         if (/^[0-9,]+$/.test(text)) {
            changeAmount = text;
-           break; // 첫 번째로 나오는 순수 숫자가 '변동액'입니다. 찾으면 중단!
+           break;
         }
       }
     }
@@ -409,20 +420,36 @@ async function fetchMessages() {
   ];
 }
 
-// 5. Videos (Dummy)
+// 5. Videos
 async function fetchVideos() {
+  const VIDEO_ID = 'M7lc1UVf-VE';
+  const LIST_ID = null;
+
+  let videoTitle = 'official test';
+
+  try {
+    const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${VIDEO_ID}&format=json`);
+    if (response.ok) {
+      const data = await response.json();
+      videoTitle = data.title;
+    }
+  } catch (error) {
+    console.warn('제목 로딩 실패');
+  }
+
   return [
     {
       id: 'youtube',
       type: 'video',
       icon: '▶️',
-      title: '[무한도전] 사냥꾼',
-      thumbnail: 'https://via.placeholder.com/300x160/000000/FFFFFF?text=YouTube+Video'
+      title: videoTitle,
+      videoId: VIDEO_ID,
+      listId : LIST_ID
     }
   ];
 }
 
-// 6. Images (Dummy)
+// 6. Images
 async function fetchImages() {
   try {
     const response = await fetch('https://api.thecatapi.com/v1/images/search', {
