@@ -81,6 +81,20 @@ function renderSidebar() {
             <button id="closeSettings" class="close-btn">✕</button>
           </div>
           <div class="settings-body">
+            <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; margin-bottom: 12px;">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px;">
+                🐙 GitHub Personal Access Token
+              </label>
+              <input type="password" id="githubTokenInput" placeholder="ghp_..." 
+                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+              <button id="saveGithubToken" 
+                style="margin-top: 6px; padding: 6px 12px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                저장
+              </button>
+              <p style="font-size: 10px; color: #666; margin-top: 4px;">
+                <a href="https://github.com/settings/tokens" target="_blank" style="color: #6366f1;">토큰 생성하기</a> (notifications 권한 필요)
+              </p>
+            </div>
             <div class="widget-checkbox">
               <input type="checkbox" id="toggle-notifications" ${sidebarState.widgetSettings.notifications ? 'checked' : ''}>
               <label for="toggle-notifications">📬 알림</label>
@@ -143,6 +157,7 @@ async function loadFeed() {
       ...results[3],
       ...results[4],
       ...results[5],
+      ...results[6],
     ];
 
     sidebarState.feedItems = allItems;
@@ -428,26 +443,85 @@ function getWeatherIcon(weatherCode) {
   }
 }
 
-// 2. Notifications (Dummy)
+// 2. Notifications - GitHub API 실제 연동
 async function fetchNotifications() {
-  return [
-    {
-      id: 'github',
+  const { githubToken } = await chrome.storage.sync.get(['githubToken']);
+  
+  // GitHub 토큰이 없으면 설정 안내
+  if (!githubToken) {
+    return [
+      {
+        id: 'setup-github',
+        type: 'notification',
+        icon: '⚙️',
+        title: 'GitHub 알림 설정',
+        subtitle: '설정에서 Personal Access Token을 입력하세요',
+        time: '지금'
+      }
+    ];
+  }
+  
+  try {
+    // GitHub Notifications API 호출
+    const response = await fetch('https://api.github.com/notifications', {
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    if (!response.ok) throw new Error('GitHub API failed');
+    
+    const data = await response.json();
+    
+    // 최근 5개만 표시
+    return data.slice(0, 5).map(notif => ({
+      id: notif.id,
       type: 'notification',
-      icon: '🐙',
-      title: 'GitHub',
-      subtitle: 'New Pull Request !wantoshome!',
-      time: '3일 전'
-    },
-    {
-      id: 'gmail',
-      type: 'notification',
-      icon: '✉️',
-      title: 'Gmail',
-      subtitle: 'Google서비스에서 [편 밀림 알림]',
-      time: '3시간 전'
-    }
-  ];
+      icon: getNotificationIcon(notif.subject.type),
+      title: notif.repository.full_name,
+      subtitle: notif.subject.title,
+      time: getTimeAgo(notif.updated_at),
+      url: notif.subject.url
+    }));
+    
+  } catch (error) {
+    console.error('GitHub notification error:', error);
+    return [
+      {
+        id: 'github-error',
+        type: 'notification',
+        icon: '⚠️',
+        title: 'GitHub 알림 로딩 실패',
+        subtitle: '토큰을 확인하거나 나중에 다시 시도하세요',
+        time: '지금'
+      }
+    ];
+  }
+}
+
+function getNotificationIcon(type) {
+  switch(type) {
+    case 'PullRequest': return '🔀';
+    case 'Issue': return '❗';
+    case 'Commit': return '💾';
+    case 'Release': return '🚀';
+    default: return '📬';
+  }
+}
+
+function getTimeAgo(dateString) {
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffMs = now - past;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return '방금 전';
+  if (diffMins < 60) return `${diffMins}분 전`;
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  return `${diffDays}일 전`;
 }
 
 // 3. Stocks - 급등주 TOP 5
@@ -677,6 +751,19 @@ function setupTabNavigation() {
   const settingsModal = document.getElementById('settingsModal');
   const closeBtn = document.getElementById('closeSettings');
   const feedContainer = document.getElementById('feedContainer');
+  const saveTokenBtn = document.getElementById('saveGithubToken');
+  if (saveTokenBtn) {
+    saveTokenBtn.addEventListener('click', async () => {
+      const input = document.getElementById('githubTokenInput');
+      const token = input.value.trim();
+    
+      if (token) {
+        await chrome.storage.sync.set({ githubToken: token });
+        alert('GitHub 토큰이 저장되었습니다!');
+        loadFeed(); // 알림 새로고침
+      }
+    });
+  }
 
   if (settingBtn) {
     settingBtn.addEventListener('click', () => {
