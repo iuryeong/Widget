@@ -424,14 +424,36 @@ async function fetchVideos() {
 
 // 6. Images (Dummy)
 async function fetchImages() {
-  return [
-    {
-      id: 'cat',
-      type: 'image',
-      icon: '🐱',
-      imageUrl: 'https://via.placeholder.com/300x200?text=Random+Image'
-    }
-  ];
+  try {
+    const response = await fetch('https://api.thecatapi.com/v1/images/search', {
+      cache: 'no-store'
+    });
+    
+    if (!response.ok) throw new Error('Cat API failed');
+
+    const data = await response.json();
+    const catImageUrl = data[0].url;
+
+    return [
+      {
+        id: 'random-cat',
+        type: 'image',
+        icon: '🐱',
+        imageUrl: catImageUrl
+      }
+    ];
+
+  } catch (error) {
+    console.warn('[Widget] 고양이 사진 로딩 실패:', error);
+    return [
+      {
+        id: 'cat-fail',
+        type: 'image',
+        icon: '😿',
+        imageUrl: 'https://via.placeholder.com/300x200?text=No+Cat+Found'
+      }
+    ];
+  }
 }
 
 /**
@@ -441,6 +463,7 @@ function setupTabNavigation() {
   const settingBtn = document.getElementById('setting');
   const settingsModal = document.getElementById('settingsModal');
   const closeBtn = document.getElementById('closeSettings');
+  const feedContainer = document.getElementById('feedContainer');
 
   if (settingBtn) {
     settingBtn.addEventListener('click', () => {
@@ -483,6 +506,33 @@ function setupTabNavigation() {
       });
     }
   });
+  if (feedContainer) {
+    feedContainer.addEventListener('click', async (e) => {
+      // 클릭된 요소가 .image-card 내부인지 확인
+      const imageCard = e.target.closest('.image-card');
+      
+      if (imageCard) {
+        const imgElement = imageCard.querySelector('img');
+        
+        if (imgElement) imgElement.style.opacity = '0.5';
+
+        const newImages = await fetchImages();
+        
+        if (newImages && newImages.length > 0 && imgElement) {
+          const newSrc = newImages[0].imageUrl;
+          const tempImg = new Image();
+          tempImg.src = newSrc;
+          
+          tempImg.onload = () => {
+            imgElement.src = newSrc;
+            imgElement.style.opacity = '1'; // 다시 선명하게
+          };
+        } else {
+            imgElement.style.opacity = '1';
+        }
+      }
+    });
+  }
 }
 
 function getWeatherIcon(code) {

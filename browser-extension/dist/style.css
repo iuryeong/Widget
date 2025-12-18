@@ -229,6 +229,14 @@ body {
   padding: 0;
   overflow: hidden;
   border-radius: 8px;
+
+  cursor: pointer;
+  position: relative;
+}
+
+.image-card:active {
+  transform: scale(0.98);
+  opacity: 0.8;
 }
 
 .image-card img {
