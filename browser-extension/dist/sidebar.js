@@ -1,20 +1,10 @@
 /**
  * Sidebar UI Controller
- * This is the main entry point for the sidebar panel
+ * - 날씨: 실제 API 사용 (WidgetAPIs)
+ * - 나머지: 테스트용 더미 데이터 사용
  */
 
 console.log('[Widget] Sidebar loaded');
-
-// API Configuration
-const API_CONFIG = {
-  notifications: 'https://api.example.com/notifications',
-  weather: 'https://api.example.com/weather',
-  stocks: 'https://api.example.com/stocks',
-  time: 'https://api.example.com/time',
-  messages: 'https://api.example.com/messages',
-  videos: 'https://api.example.com/videos',
-  images: 'https://api.example.com/images',
-};
 
 // Global sidebar state
 const sidebarState = {
@@ -39,13 +29,14 @@ async function initSidebar() {
   try {
     console.log('[Widget] Initializing sidebar...');
     
-    // Load settings from storage
-    const result = await chrome.storage.sync.get(['settings', 'widgetSettings']);
-    sidebarState.settings = result.settings;
-    
-    // Load widget settings
-    if (result.widgetSettings) {
-      sidebarState.widgetSettings = result.widgetSettings;
+    // Load settings from storage (에러 방지용 예외처리)
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+      const result = await chrome.storage.sync.get(['settings', 'widgetSettings']);
+      sidebarState.settings = result.settings;
+      
+      if (result.widgetSettings) {
+        sidebarState.widgetSettings = result.widgetSettings;
+      }
     }
 
     // Initialize UI
@@ -65,6 +56,8 @@ async function initSidebar() {
  */
 function renderSidebar() {
   const root = document.getElementById('root');
+  if (!root) return;
+
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0].replace(/-/g, '.');
   
@@ -150,13 +143,17 @@ async function loadFeed() {
 
     sidebarState.feedItems = allItems;
     
-    // Render all items
-    container.innerHTML = allItems
-      .map((item) => renderFeedItem(item))
-      .join('');
+    if (allItems.length === 0) {
+        container.innerHTML = '<div style="padding:16px; text-align:center; color:#666">활성화된 위젯이 없습니다.</div>';
+    } else {
+        container.innerHTML = allItems
+        .map((item) => renderFeedItem(item))
+        .join('');
+    }
+
   } catch (error) {
     console.error('[Widget] Error loading feed:', error);
-    container.innerHTML = '<div style="padding: 16px; color: #666;">데이터를 불러오는 중에 오류가 발생했습니다.</div>';
+    container.innerHTML = '<div style="padding: 16px; color: #666;">데이터 로딩 중 오류가 발생했습니다.</div>';
   }
 }
 
@@ -178,15 +175,7 @@ function renderFeedItem(item) {
           <div class="card-time">${item.time}</div>
         </div>
       `;
-    case 'time':
-      return `
-        <div class="feed-card time-card">
-          <h4>${item.title}</h4>
-          <p class="time-display">${new Date().toLocaleTimeString('ko-KR')}</p>
-          <p class="time-date">${new Date().toLocaleDateString('ko-KR')}</p>
-          <span class="card-time">${item.time}</span>
-        </div>
-      `;
+
     case 'weather':
       return `
         <div class="feed-card weather-card">
@@ -198,7 +187,21 @@ function renderFeedItem(item) {
           <p class="weather-range">${item.tempRange}</p>
         </div>
       `;
+
     case 'stock':
+      let chartArea = '';
+      if (item.isPreMarket) {
+        chartArea = `
+          <div style="height: 40px; background: #f8f9fa; border-radius: 4px; margin-top: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #888;">
+            😴 개장 전 (09:00 오픈)
+          </div>`;
+      } else {
+        chartArea = `
+          <div style="margin-top: 8px; text-align: center;">
+            <img src="${item.chartUrl}?t=${new Date().getTime()}" alt="차트" style="width: 100%; height: auto; border-radius: 4px;" />
+          </div>`;
+      }
+
       return `
         <div class="feed-card stock-card">
           <div class="stock-header">
@@ -206,16 +209,17 @@ function renderFeedItem(item) {
             <h4>${item.title}</h4>
           </div>
           <div class="stock-price">
-            <span class="price">${item.price}</span>
-            <span class="change">${item.change}</span>
+            <span class="price" style="color: ${item.changeColor}">${item.price}</span>
+            <span class="change" style="color: ${item.changeColor}">${item.change}</span>
           </div>
-          ${item.hasChart ? '<div class="stock-chart" style="height: 40px; background: #f0f0f0; border-radius: 4px;"></div>' : ''}
+          ${chartArea}
         </div>
       `;
+
     case 'image':
       return `
         <div class="feed-card image-card">
-          <img src="${item.imageUrl}" alt="Random" onerror="this.src='https://via.placeholder.com/100?text=Image'" />
+          <img src="${item.imageUrl}" alt="Random" style="width:100%; border-radius:8px;" onerror="this.src='https://via.placeholder.com/300x200?text=No+Image'" />
         </div>
       `;
     case 'message':
@@ -225,9 +229,10 @@ function renderFeedItem(item) {
             <span class="card-icon">${item.icon}</span>
             <p>${item.text}</p>
           </div>
-          <p class="sender">${item.sender}</p>
+          <p class="sender" style="font-size:12px; color:#888; margin-top:5px;">${item.sender}</p>
         </div>
       `;
+      
     case 'video':
       return `
         <div class="feed-card video-card">
@@ -235,8 +240,8 @@ function renderFeedItem(item) {
             <span class="card-icon">${item.icon}</span>
             <h4>${item.title}</h4>
           </div>
-          <div class="video-thumbnail">
-            <img src="${item.thumbnail}" alt="Video" />
+          <div class="video-thumbnail" style="margin-top:8px;">
+            <img src="${item.thumbnail}" alt="Video" style="width:100%; border-radius:8px;" />
           </div>
         </div>
       `;
@@ -246,166 +251,232 @@ function renderFeedItem(item) {
 }
 
 /**
+ * =================================================
  * API Fetch Functions
+ * 날씨: 실제 데이터 사용 (WidgetAPIs)
+ * 나머지: 더미 데이터 사용 (에러 방지)
+ * =================================================
  */
 
-// Fetch notifications from API
-async function fetchNotifications() {
-  try {
-    const response = await fetch(API_CONFIG.notifications);
-    if (!response.ok) throw new Error('Notifications API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Notifications API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'github',
-        type: 'notification',
-        icon: '□',
-        title: 'Git Hub',
-        subtitle: 'New Pull Request !wantoshome!서서 Pull Request 정하고있습니다.',
-        time: '3일 전'
-      },
-      {
-        id: 'gmail',
-        type: 'notification',
-        icon: '✉️',
-        title: 'Gmail',
-        subtitle: 'Google서비스에서 [편 밀림 알림]을 받으셨습니다.',
-        time: '3시간 전'
-      }
-    ];
-  }
-}
-
-// Fetch weather from API
+// 1. Weather
 async function fetchWeather() {
   try {
-    const response = await fetch(API_CONFIG.weather);
-    if (!response.ok) throw new Error('Weather API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Weather API error:', error);
-    // Return sample data as fallback
+    if (typeof WidgetAPIs === 'undefined') {
+        console.warn('WidgetAPIs not found');
+        throw new Error('API not loaded');
+    }
+
+    const data = await WidgetAPIs.getWeather();
+    if (!data) throw new Error('Weather API failed');
+
+    const temp = Math.round(data.temperature);
+    const humid = data.humidity;
+    const code = data.weatherCode;
+    // const lat = data.locationInfo.lat;
+    // const lon = data.locationInfo.lon;
+
     return [
       {
-        id: 'weather',
+        id: 'weather-real',
         type: 'weather',
-        icon: '🌤️',
-        title: '제주특별자치 아라동',
-        temp: '3°',
-        tempRange: '최고 5° 최저 -1°'
+        icon: getWeatherIcon(code),
+        title: '현재 위치 날씨', // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
+        temp: `${temp}°C`,
+        tempRange: `습도: ${humid}%`
+      }
+    ];
+  } catch (error) {
+    console.error('Weather load error:', error);
+    // 실패 시 보여줄 기본값
+    return [
+      {
+        id: 'weather-fallback',
+        type: 'weather',
+        icon: '🌦️',
+        title: '날씨 정보 없음',
+        temp: '-',
+        tempRange: '로딩 실패'
       }
     ];
   }
 }
 
-// Fetch stocks from API
+// 2. Notifications (Dummy)
+async function fetchNotifications() {
+  return [
+    {
+      id: 'github',
+      type: 'notification',
+      icon: '🐙',
+      title: 'GitHub',
+      subtitle: 'New Pull Request !wantoshome!',
+      time: '3일 전'
+    },
+    {
+      id: 'gmail',
+      type: 'notification',
+      icon: '✉️',
+      title: 'Gmail',
+      subtitle: 'Google서비스에서 [편 밀림 알림]',
+      time: '3시간 전'
+    }
+  ];
+}
+
+// 3. Stocks
 async function fetchStocks() {
   try {
-    const response = await fetch(API_CONFIG.stocks);
-    if (!response.ok) throw new Error('Stocks API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Stocks API error:', error);
-    // Return sample data as fallback
+    const now = new Date();
+    const hours = now.getHours();
+    const isPreMarket = hours < 9;
+    
+    const response = await fetch('https://finance.naver.com/item/main.naver?code=035720');
+    const buffer = await response.arrayBuffer();
+    const decoder = new TextDecoder('euc-kr');
+    const html = decoder.decode(buffer);
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const priceElement = doc.querySelector('.no_today .blind');
+    const price = priceElement ? priceElement.innerText : '-';
+
+    const marketInfo = doc.querySelector('.no_exday');
+    let changeAmount = '0';
+    let changeSymbol = ''; 
+    let changeColor = '#333'; // 기본 검정
+    
+    if (marketInfo) {
+      const htmlContent = marketInfo.innerHTML;
+      
+      if (htmlContent.includes('no_up') || htmlContent.includes('ico_up')) {
+        changeSymbol = '▲';
+        changeColor = '#d32f2f'; // 빨강
+      } else if (htmlContent.includes('no_down') || htmlContent.includes('ico_down')) {
+        changeSymbol = '▼';
+        changeColor = '#1976d2'; // 파랑
+      } else {
+        changeSymbol = '-';
+        changeColor = '#333';
+      }
+      const blinds = marketInfo.querySelectorAll('.blind');
+
+      for (let span of blinds) {
+        const text = span.innerText.trim();
+        // 콤마(,)와 숫자만 있는 문자열을 찾음 (퍼센트% 나 글자가 섞인 건 무시)
+        if (/^[0-9,]+$/.test(text)) {
+           changeAmount = text;
+           break; // 첫 번째로 나오는 순수 숫자가 '변동액'입니다. 찾으면 중단!
+        }
+      }
+    }
+
+  return [
+    {
+      id: 'kakao',
+      type: 'stock',
+      icon: '📈',
+      title: '카카오',
+      price: `${price}원`,
+      change: `${changeSymbol} ${changeAmount}`,
+      changeColor: changeColor,
+      isPreMarket: isPreMarket,
+      chartUrl: 'https://ssl.pstatic.net/imgfinance/chart/mobile/mini/035720.png' 
+    },
+  ];
+} catch (error) {
+    console.error('Stock fetch error:', error);
     return [
       {
-        id: 'kakao',
-        type: 'stock',
-        icon: '📈',
-        title: '카카오',
-        price: '60,900',
-        change: '△700',
-        hasChart: true
-      }
+        id: 'kakao-fail', type: 'stock', icon: '⚠️', title: '카카오',
+      price: '-', change: '로딩 실패', changeColor: '#999',
+      isPreMarket: false, chartUrl: ''
+      },
     ];
-  }
+  } 
 }
 
-// Fetch messages from API
+// 4. Messages (Dummy)
 async function fetchMessages() {
-  try {
-    const response = await fetch(API_CONFIG.messages);
-    if (!response.ok) throw new Error('Messages API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Messages API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'message',
-        type: 'message',
-        icon: '💬',
-        text: '좋은 아침입니다. WooRyeong!',
-        sender: '프로필'
-      }
-    ];
-  }
+  return [
+    {
+      id: 'message',
+      type: 'message',
+      icon: '💬',
+      text: '좋은 아침입니다. WooRyeong!',
+      sender: '프로필'
+    }
+  ];
 }
 
-// Fetch videos from API
+// 5. Videos (Dummy)
 async function fetchVideos() {
-  try {
-    const response = await fetch(API_CONFIG.videos);
-    if (!response.ok) throw new Error('Videos API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Videos API error:', error);
-    // Return sample data as fallback
-    return [
-      {
-        id: 'youtube',
-        type: 'video',
-        icon: '▶️',
-        title: '[무한도전] 사냥꾼',
-        thumbnail: 'https://via.placeholder.com/100x100?text=Video'
-      }
-    ];
-  }
+  return [
+    {
+      id: 'youtube',
+      type: 'video',
+      icon: '▶️',
+      title: '[무한도전] 사냥꾼',
+      thumbnail: 'https://via.placeholder.com/300x160/000000/FFFFFF?text=YouTube+Video'
+    }
+  ];
 }
 
-// Fetch images from API
+// 6. Images (Dummy)
 async function fetchImages() {
   try {
-    const response = await fetch(API_CONFIG.images);
-    if (!response.ok) throw new Error('Images API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Images API error:', error);
-    // Return sample data as fallback
+    const response = await fetch('https://api.thecatapi.com/v1/images/search', {
+      cache: 'no-store'
+    });
+    
+    if (!response.ok) throw new Error('Cat API failed');
+
+    const data = await response.json();
+    const catImageUrl = data[0].url;
+
     return [
       {
-        id: 'cat',
+        id: 'random-cat',
         type: 'image',
         icon: '🐱',
-        imageUrl: 'https://api.thecatapi.com/v1/images/search'
+        imageUrl: catImageUrl
+      }
+    ];
+
+  } catch (error) {
+    console.warn('[Widget] 고양이 사진 로딩 실패:', error);
+    return [
+      {
+        id: 'cat-fail',
+        type: 'image',
+        icon: '😿',
+        imageUrl: 'https://via.placeholder.com/300x200?text=No+Cat+Found'
       }
     ];
   }
 }
 
+/**
+ * Event Listeners & Helpers
+ */
 function setupTabNavigation() {
   const settingBtn = document.getElementById('setting');
   const settingsModal = document.getElementById('settingsModal');
   const closeBtn = document.getElementById('closeSettings');
+  const feedContainer = document.getElementById('feedContainer');
 
-  // Open settings modal
   if (settingBtn) {
     settingBtn.addEventListener('click', () => {
       settingsModal.classList.add('active');
     });
   }
 
-  // Close settings modal
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       settingsModal.classList.remove('active');
     });
   }
 
-  // Close modal when clicking outside
   if (settingsModal) {
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) {
@@ -414,7 +485,6 @@ function setupTabNavigation() {
     });
   }
 
-  // Handle widget toggles
   const toggles = {
     'toggle-notifications': 'notifications',
     'toggle-weather': 'weather',
@@ -429,30 +499,51 @@ function setupTabNavigation() {
     if (element) {
       element.addEventListener('change', (e) => {
         sidebarState.widgetSettings[settingKey] = e.target.checked;
-        
-        // Save to storage
-        chrome.storage.sync.set({ widgetSettings: sidebarState.widgetSettings });
-        
-        // Reload feed
+        if(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+            chrome.storage.sync.set({ widgetSettings: sidebarState.widgetSettings });
+        }
         loadFeed();
       });
     }
   });
+  if (feedContainer) {
+    feedContainer.addEventListener('click', async (e) => {
+      // 클릭된 요소가 .image-card 내부인지 확인
+      const imageCard = e.target.closest('.image-card');
+      
+      if (imageCard) {
+        const imgElement = imageCard.querySelector('img');
+        
+        if (imgElement) imgElement.style.opacity = '0.5';
+
+        const newImages = await fetchImages();
+        
+        if (newImages && newImages.length > 0 && imgElement) {
+          const newSrc = newImages[0].imageUrl;
+          const tempImg = new Image();
+          tempImg.src = newSrc;
+          
+          tempImg.onload = () => {
+            imgElement.src = newSrc;
+            imgElement.style.opacity = '1'; // 다시 선명하게
+          };
+        } else {
+            imgElement.style.opacity = '1';
+        }
+      }
+    });
+  }
 }
 
-/**
- * Helper: Get widget title
- */
-function getWidgetTitle(type) {
-  const titles = {
-    weather: '날씨',
-    stocks: '주식',
-    clock: '시계',
-    todo: '할 일',
-    random_image: '이미지',
-    media_control: '미디어 제어',
-  };
-  return titles[type] || type;
+function getWeatherIcon(code) {
+  if (code === 0) return '☀️'; 
+  if (code <= 3) return '⛅'; 
+  if (code <= 48) return '🌫️'; 
+  if (code <= 67) return '🌧️'; 
+  if (code <= 77) return '🌨️'; 
+  if (code <= 82) return '🌧️'; 
+  if (code <= 99) return '⛈️'; 
+  return '❓';
 }
 
 // Initialize sidebar when DOM is ready

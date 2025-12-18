@@ -3,6 +3,8 @@
  * This is the main entry point for the sidebar panel
  */
 
+import { WidgetAPIs } from "../src/api/notifications.js";
+
 console.log('[Widget] Sidebar loaded');
 
 // API Configuration
@@ -244,12 +246,12 @@ function renderFeedItem(item) {
       return '';
   }
 }
-
 /**
  * API Fetch Functions
  */
 
 // Fetch notifications from API
+/** */
 async function fetchNotifications() {
   try {
     const response = await fetch(API_CONFIG.notifications);
@@ -282,22 +284,27 @@ async function fetchNotifications() {
 // Fetch weather from API
 async function fetchWeather() {
   try {
-    const response = await fetch(API_CONFIG.weather);
-    if (!response.ok) throw new Error('Weather API failed');
-    return await response.json();
-  } catch (error) {
-    console.warn('[Widget] Weather API error:', error);
-    // Return sample data as fallback
+    const data = await WidgetAPIs.getWeather();
+    if(!data)
+      throw new Error('Weather API failed');
+
+    const temp = Math.round(data.temperature);
+    const humid = data.humidity;
+    const code = data.weatherCode;
+
     return [
       {
-        id: 'weather',
+        id: 'weather-ip',
         type: 'weather',
-        icon: '🌤️',
-        title: '제주특별자치 아라동',
-        temp: '3°',
-        tempRange: '최고 5° 최저 -1°'
+        icon: getWeatherIcon(code),
+        title: '현재위치날씨',
+        temp: `${temp}°C`,
+        tempRange: `습도: ${humid}%`
       }
     ];
+  } catch (error) {
+    console.error(error);
+    return [];
   }
 }
 
@@ -453,6 +460,17 @@ function getWidgetTitle(type) {
     media_control: '미디어 제어',
   };
   return titles[type] || type;
+}
+
+function getWeatherIcon(code) {
+  if (code === 0) return '☀️'; 
+  if (code <= 3) return '⛅'; 
+  if (code <= 48) return '🌫️'; 
+  if (code <= 67) return '🌧️'; 
+  if (code <= 77) return '🌨️'; 
+  if (code <= 82) return '🌧️'; 
+  if (code <= 99) return '⛈️'; 
+  return '❓';
 }
 
 // Initialize sidebar when DOM is ready
