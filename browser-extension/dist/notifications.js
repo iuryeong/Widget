@@ -1,4 +1,4 @@
-// [순수 JS 버전] notifications.js
+  // [순수 JS 버전] notifications.js
 
 /**
  * Gmail API wrapper
