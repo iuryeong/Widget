@@ -126,11 +126,12 @@ async function loadFeed() {
     // Fetch data from APIs in parallel
     const results = await Promise.all([
       sidebarState.widgetSettings.notifications ? fetchNotifications() : Promise.resolve([]),
+      (sidebarState.widgetSettings.memo !== false) ? fetchMemo() : Promise.resolve([]),
       sidebarState.widgetSettings.weather ? fetchWeather() : Promise.resolve([]),
       sidebarState.widgetSettings.stocks ? fetchStocks() : Promise.resolve([]),
-      sidebarState.widgetSettings.messages ? fetchMessages() : Promise.resolve([]),
       sidebarState.widgetSettings.videos ? fetchVideos() : Promise.resolve([]),
       sidebarState.widgetSettings.images ? fetchImages() : Promise.resolve([]),
+      sidebarState.widgetSettings.messages ? fetchMessages() : Promise.resolve([]),
     ]);
 
     // Combine all items
@@ -258,6 +259,32 @@ function renderFeedItem(item) {
               allowfullscreen>
             </iframe>
           </div>
+        </div>
+      `;
+
+      case 'memo':
+        return `
+        <div class="feed-card memo-card" style="padding: 12px;">
+          <div class="memo-header" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <span class="card-icon">${item.icon}</span>
+            <h4 style="font-size: 13px; font-weight: 600; margin: 0;">나만의 메모장</h4>
+          </div>
+          <textarea 
+            id="memoInput" 
+            placeholder="메모해보시던가.." 
+            style="
+              width: 100%; 
+              height: 100px; 
+              border: 1px solid #eee; 
+              border-radius: 6px; 
+              padding: 8px; 
+              font-family: sans-serif; 
+              font-size: 13px; 
+              resize: vertical; 
+              outline: none;
+              background-color: #fffcF0;
+              color: #333;
+            ">${item.text}</textarea>
         </div>
       `;
     default:
@@ -407,7 +434,7 @@ async function fetchStocks() {
   } 
 }
 
-// 4. Messages (Dummy)
+// 4. Messages
 async function fetchMessages() {
   return [
     {
@@ -483,6 +510,24 @@ async function fetchImages() {
   }
 }
 
+// 7.Memo
+async function fetchMemo() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['userMemo'], (result) => {
+      const savedText = result.userMemo || '';
+      
+      resolve([
+        {
+          id: 'my-memo',
+          type: 'memo',
+          icon: '📝',
+          text: savedText
+        }
+      ]);
+    });
+  });
+}
+
 /**
  * Event Listeners & Helpers
  */
@@ -508,6 +553,27 @@ function setupTabNavigation() {
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) {
         settingsModal.classList.remove('active');
+      }
+    });
+  }
+
+  if (feedContainer) {
+    let timeoutId; // 디바운싱(Debouncing)용 변수
+
+    feedContainer.addEventListener('input', (e) => {
+      // 이벤트가 발생한 요소가 메모장 인풋인지 확인
+      if (e.target && e.target.id === 'memoInput') {
+        const text = e.target.value;
+
+        // 1. 타이핑 할 때마다 즉시 저장하면 성능에 안 좋으니, 
+        //    타이핑이 멈추고 0.5초 뒤에 저장하도록 처리 (디바운싱)
+        clearTimeout(timeoutId);
+        
+        timeoutId = setTimeout(() => {
+          chrome.storage.sync.set({ userMemo: text }, () => {
+            console.log('메모 저장됨:', text);
+          });
+        }, 500); // 0.5초 딜레이
       }
     });
   }
