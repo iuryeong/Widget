@@ -25,13 +25,7 @@ const sidebarState = {
   bookmarks: [],
   activeMedia: null,
   feedItems: [],
-  widgetOrder: [
-    "notifications",
-    "weather",
-    "stocks",
-    "videos",
-    "images",
-  ],
+  widgetOrder: ["notifications", "weather", "stocks", "videos", "images"],
   widgetSettings: {
     notifications: true,
     weather: true,
