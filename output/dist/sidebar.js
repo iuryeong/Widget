@@ -640,7 +640,6 @@ async function fetchStocks() {
     const hours = now.getHours();
     const isPreMarket = hours < 9 || hours >= 16;
 
-    // Background로 요청 (CORS 우회)
     const response = await chrome.runtime.sendMessage({ type: "FETCH_STOCKS" });
 
     if (!response.success) {
@@ -695,7 +694,7 @@ async function fetchStocks() {
       // 디버깅용 로그 추가
       console.log(`[Stock Debug] ${name} -> code: ${stockCode}, url: ${link}`);
 
-      stocks.push({
+      stocks.push({ 
         id: `stock-rise-${stockCode}`,
         type: "stock",
         icon: "🔥",
