@@ -404,7 +404,7 @@ async function fetchWeather() {
         icon: getWeatherIcon(weatherCode),
         title: `현재 위치 날씨 (${locationName})`, // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
         temp: `${temp}°C`,
-        tempRange: `최고 ${tempMax}° / 최저 ${tempMin}° (습도: ${humidity}%)`
+        tempRange: `습도: ${humidity}%`
       }
     ];
   } catch (error) {
