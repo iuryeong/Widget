@@ -5,11 +5,9 @@ chrome.runtime.onInstalled.addListener(() => {
     .catch((error) => console.error(error));
 });
 
-// Handle extension icon click - Open side panel
 chrome.action.onClicked.addListener(async (tab) => {
   try {
     console.log('[Widget] Icon clicked for tab:', tab.id);
-    
     await chrome.sidePanel.open({ tabId: tab.id });
     console.log('[Widget] Side panel opened successfully');
   } catch (error) {
@@ -17,8 +15,22 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
-// Listen for messages from content scripts
+// CORS 우회를 위한 fetch 핸들러
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('[Widget] Message received:', request.type);
+  if (request.type === 'FETCH_STOCKS') {
+    fetch('https://finance.naver.com/sise/sise_rise.naver')
+      .then(response => response.arrayBuffer())
+      .then(buffer => {
+        const decoder = new TextDecoder('euc-kr');
+        const html = decoder.decode(buffer);
+        sendResponse({ success: true, html });
+      })
+      .catch(error => {
+        console.error('Background stock fetch error:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true; // 비동기 응답
+  }
+  
   sendResponse({ success: true });
 });

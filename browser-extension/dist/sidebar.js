@@ -531,88 +531,78 @@ function getTimeAgo(dateString) {
   return `${diffDays}일 전`;
 }
 
-// 3. Stocks - 급등주 TOP 5
+// 3. Stocks - 급등주 TOP 3
 async function fetchStocks() {
   try {
     const now = new Date();
     const hours = now.getHours();
     const isPreMarket = hours < 9 || hours >= 16;
     
-    // 네이버 금융 급등주 페이지
-    const response = await fetch('https://finance.naver.com/sise/sise_rise.naver');
-    const buffer = await response.arrayBuffer();
-    const decoder = new TextDecoder('euc-kr');
-    const html = decoder.decode(buffer);
-
+    // Background로 요청 (CORS 우회)
+    const response = await chrome.runtime.sendMessage({ type: 'FETCH_STOCKS' });
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Background fetch failed');
+    }
+    
+    const html = response.html;
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
-    // 급등주 리스트 가져오기 (상위 3개만)
     const stockRows = doc.querySelectorAll('.type_2 tbody tr');
     const stocks = [];
     
-    for (let i = 0; i < Math.min(3, stockRows.length); i++) {
+    // 모든 행 순회
+    for (let i = 0; i < stockRows.length && stocks.length < 3; i++) {
       const row = stockRows[i];
       
-      // 빈 행 건너뛰기
-      if (!row.querySelector('.tltle')) continue;
-      
       const nameElement = row.querySelector('.tltle');
-      const priceElement = row.querySelectorAll('td')[2];
-      const changeElements = row.querySelectorAll('td span');
+      if (!nameElement) continue;
       
-      if (!nameElement || !priceElement) continue;
+      const tds = row.querySelectorAll('td');
+      if (tds.length < 5) continue; // 5개 컬럼 필요
       
       const name = nameElement.innerText.trim();
-      const price = priceElement.innerText.trim();
+      if (!name) continue;
       
-      // 등락률 찾기
-      let changePercent = '0%';
-      let changeColor = '#333';
-      let changeSymbol = '';
+      const priceElement = tds[2];
+      const price = priceElement ? priceElement.innerText.trim() : '0';
       
-      for (let span of changeElements) {
-        const className = span.className;
-        const text = span.innerText.trim();
-        
-        if (className.includes('tah p11')) {
-          if (className.includes('nv01')) {
-            changeSymbol = '▲';
-            changeColor = '#d32f2f';
-          } else if (className.includes('nv02')) {
-            changeSymbol = '▼';
-            changeColor = '#1976d2';
-          }
-          
-          if (text.includes('%')) {
-            changePercent = text;
-            break;
+      // 등락률은 tds[4]에 있음
+      const changeTd = tds[4];
+      let changePercent = '+0%';
+      let changeColor = '#d32f2f';
+      
+      if (changeTd) {
+        const changeText = changeTd.innerText.trim();
+        if (changeText && changeText.includes('%')) {
+          changePercent = changeText.replace(/\s/g, '');
+          if (!changePercent.startsWith('+') && !changePercent.startsWith('-')) {
+            changePercent = '+' + changePercent;
           }
         }
       }
       
-      // 종목 코드 추출 (링크에서)
       const link = nameElement.getAttribute('href');
-      const codeMatch = link ? link.match(/code=(\d+)/) : null;
+      const codeMatch = link ? link.match(/code=([A-Za-z0-9]+)/) : null;
       const stockCode = codeMatch ? codeMatch[1] : '000000';
       
+      // 디버깅용 로그 추가
+      console.log(`[Stock Debug] ${name} -> code: ${stockCode}, url: ${link}`);
+      
       stocks.push({
-        id: `stock-${stockCode}`,
+        id: `stock-rise-${stockCode}`,
         type: 'stock',
         icon: '🔥',
         title: name,
         price: `${price}원`,
-        change: `${changeSymbol} ${changePercent}`,
+        change: `▲ ${changePercent}`,
         changeColor: changeColor,
         isPreMarket: isPreMarket,
         chartUrl: `https://ssl.pstatic.net/imgfinance/chart/mobile/mini/${stockCode}.png`
       });
-      
-      // 최대 3개까지만
-      if (stocks.length >= 3) break;
     }
     
-    // 데이터가 없으면 폴백
     if (stocks.length === 0) {
       throw new Error('No stock data found');
     }
