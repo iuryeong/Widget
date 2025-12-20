@@ -2,6 +2,12 @@
  * Sidebar UI Controller
  */
 
+
+if (typeof API_CONFIG === 'undefined') {
+  console.error('[Widget] config.js not loaded! Please create config.js from config.example.js');
+  window.API_CONFIG = {}; // Create empty object to prevent errors
+}
+
 console.log("[Widget] Sidebar loaded");
 
 // Global sidebar state
@@ -444,17 +450,13 @@ function renderFeedItem(item) {
   }
 }
 
-/**
- * =================================================
- * API Fetch Functions
- * =================================================
- */
 
+// 1. Weather - OpenWeatherMap API 연동
 async function getCurrentLocation() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       console.warn("Geolocation not supported");
-      resolve({ lat: 37.5665, lon: 126.978 }); // 기본값: 서울
+      resolve({ lat: 37.5665, lon: 126.978 });
       return;
     }
 
@@ -467,7 +469,7 @@ async function getCurrentLocation() {
       },
       (error) => {
         console.warn("Geolocation error:", error);
-        resolve({ lat: 37.5665, lon: 126.978 }); // 실패 시 기본값
+        resolve({ lat: 37.5665, lon: 126.978 }); 
       }
     );
   });
@@ -475,7 +477,19 @@ async function getCurrentLocation() {
 
 async function fetchWeather() {
   try {
-    const API_KEY = "55c2cbe5b7be23a8b79d69256be48566";
+    const API_KEY = API_CONFIG.OPENWEATHER_API_KEY;
+    
+    if (!API_KEY || API_KEY === "YOUR_API_KEY_HERE") {
+      console.error('[Widget] OpenWeather API key not configured. Please set it in config.js');
+      return [{
+        type: "weather",
+        icon: "⚠️",
+        title: "API 키 필요",
+        temp: "--°C",
+        tempRange: "config.js 파일에서 API 키를 설정하세요",
+        time: new Date().toISOString(),
+      }];
+    }
 
     const location = await getCurrentLocation();
     const lat = location.lat;
@@ -489,8 +503,6 @@ async function fetchWeather() {
     const data = await response.json();
 
     const temp = Math.round(data.main.temp);
-    const tempMin = Math.round(data.main.temp_min);
-    const tempMax = Math.round(data.main.temp_max);
     const humidity = data.main.humidity;
     const weatherCode = data.weather[0].main;
     const locationName = data.name;
@@ -500,7 +512,7 @@ async function fetchWeather() {
         id: "weather-real",
         type: "weather",
         icon: getWeatherIcon(weatherCode),
-        title: `현재 위치 날씨 (${locationName})`, // 정확한 동이름은 API가 필요하므로 일단 '현재 위치'로 표시
+        title: `현재 위치 날씨 (${locationName})`,
         temp: `${temp}°C`,
         tempRange: `습도: ${humidity}%`,
       },
