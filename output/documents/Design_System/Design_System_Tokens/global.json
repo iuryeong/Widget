@@ -1,0 +1,275 @@
+{
+  "Pretendard": {
+    "value": "Pretendard",
+    "type": "fontFamilies"
+  },
+  "color": {
+    "primary": {
+      "value": "#273553",
+      "type": "color",
+      "description": "위젯 사이드바 최상단의 날짜 영역에 적용된다. 해당 날짜 영역은 사용자가 서비스를 인지하는 데 있어 시각적 기준점(Anchor) 역할을 수행한다."
+    },
+    "text": {
+      "primary": {
+        "value": "#000000",
+        "type": "color",
+        "description": "위젯의 이름, 본문 등 주요 정보 전달을 위한 색상이다."
+      },
+      "secondary": {
+        "value": "#909090",
+        "type": "color",
+        "description": "시간, 날짜, 보조 설명 등 부가 정보 전달을 위한 색상이다."
+      }
+    },
+    "background": {
+      "value": "#F2F4F7",
+      "type": "color",
+      "description": "위젯 사이드바의 서비스 영역에 적용되어 위젯의 영역 구분을 가능하게 한다."
+    },
+    "alert": {
+      "value": "#F60000",
+      "type": "color",
+      "description": "위젯 내 알림 발생 여부를 시각적으로 전달하기 위해 사용된다."
+    },
+    "widgetLogo": {
+      "red": {
+        "from": {
+          "value": "#E97A7C",
+          "type": "color",
+          "description": "Red Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#E90004",
+          "type": "color",
+          "description": "Red Widget Logo 그라데이션의 하단 색상"
+        }
+      },
+      "orange": {
+        "from": {
+          "value": "#E9BB7A",
+          "type": "color",
+          "description": "Orange Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#E9A300",
+          "type": "color",
+          "description": "Orange Widget Logo 그라데이션의 하단 색상"
+        }
+      },
+      "yellow": {
+        "from": {
+          "value": "#Fef49e",
+          "type": "color",
+          "description": "Yellow Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#F2BD00",
+          "type": "color",
+          "description": "Yellow Widget Logo 그라데이션의 하단 색상"
+        }
+      },
+      "blue": {
+        "from": {
+          "value": "#ACE9FF",
+          "type": "color",
+          "description": "Blue Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#00A3E9",
+          "type": "color",
+          "description": "Blue Widget Logo 그라데이션의 하단 색상"
+        }
+      },
+      "pink": {
+        "from": {
+          "value": "#E97a92",
+          "type": "color",
+          "description": "Pink Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#E9003E",
+          "type": "color",
+          "description": "Pink Widget Logo 그라데이션의 하단 색상"
+        }
+      },
+      "black": {
+        "from": {
+          "value": "#CBCBCB",
+          "type": "color",
+          "description": "Black Widget Logo 그라데이션의 상단 색상"
+        },
+        "to": {
+          "value": "#000000",
+          "type": "color",
+          "description": "Black Widget Logo 그라데이션의 하단 색상"
+        }
+      }
+    }
+  },
+  "text": {
+    "display": {
+      "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 18, \"fontWeight\": 700",
+      "type": "text",
+      "description": "가장 큰 텍스트로 위젯 사이드바 최상단의 날짜 영역에 적용된다."
+    },
+    "heading": {
+      "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 14, \"fontWeight\": 700",
+      "type": "text",
+      "description": "위젯 별 타이틀에 적용된다."
+    },
+    "body": {
+      "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 11, \"fontWeight\": 400",
+      "type": "text",
+      "description": "위젯 내에서 주요 정보를 전달한다."
+    },
+    "caption": {
+      "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 10, \"fontWeight\": 400",
+      "type": "text",
+      "description": "위젯 내에서 시간, 날짜, 보조 설명 등의 부가 정보를 전달한다."
+    }
+  },
+  "shape": {
+    "logo": {
+      "width": {
+        "value": "20px",
+        "type": "sizing",
+        "description": "Logo 아이콘의 너비(가로 길이)"
+      },
+      "height": {
+        "value": "20px",
+        "type": "sizing",
+        "description": "Logo 아이콘의 높이(세로 길이)"
+      },
+      "radius": {
+        "value": "7px",
+        "type": "borderRadius",
+        "description": "Logo 아이콘의 모서리 곡률"
+      }
+    },
+    "widget": {
+      "width": {
+        "value": "352px",
+        "type": "sizing",
+        "description": "위젯의 너비(가로 길이)"
+      }
+    },
+    "widgetSmall": {
+      "width": {
+        "value": "168px",
+        "type": "sizing",
+        "description": "widgetSmall의 너비(가로 길이)"
+      }
+    }
+  },
+  "depth": {
+    "shadow": {
+      "value": {
+        "x": "0",
+        "y": "0",
+        "blur": "4",
+        "spread": "0",
+        "color": "#BABABA",
+        "type": "dropShadow"
+      },
+      "type": "boxShadow",
+      "description": "위젯의 경계에 적용되어 요소 간 공간적 깊이감을 부여한다."
+    }
+  },
+  "widget": {
+    "weather": {
+      "currTemp": {
+        "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 40, \"fontWeight\": 700",
+        "type": "text",
+        "description": "날씨 위젯의 현재 기온 정보를 표시한다."
+      },
+      "specificTemp": {
+        "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 14, \"fontWeight\": 400",
+        "type": "text",
+        "description": "날씨 위젯의 최고 기온, 최저 기온 정보를 표시한다."
+      }
+    },
+    "stock": {
+      "currPrice": {
+        "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 24, \"fontWeight\": 700",
+        "type": "text",
+        "description": "주식 위젯의 현재 주가 정보를 표시한다."
+      },
+      "priceGap": {
+        "value": "\"fontFamily\": \"Pretendard\", \"fontSize\": 14, \"fontWeight\": 400",
+        "type": "text",
+        "description": "주식 위젯의 주가 상승/하락률 정보를 표시한다."
+      },
+      "color": {
+        "priceRise": {
+          "value": "#F60000",
+          "type": "color",
+          "description": "주식 위젯의 상승 주가에 적용되는 색상이다."
+        },
+        "priceFall": {
+          "value": "#2063EA",
+          "type": "color",
+          "description": "주식 위젯의 하락 주가에 적용되는 색상이다."
+        }
+      }
+    }
+  },
+  "setting": {
+    "modal": {
+      "background": {
+        "color": {
+          "value": "#000000",
+          "type": "color",
+          "description": "설정 모달의 배경화면에 적용되는 색상이다. 투명도는 0.5로 설정해야 한다."
+        }
+      }
+    },
+    "widgetBox": {
+      "color": {
+        "default": {
+          "value": "#F5F5F5",
+          "type": "color",
+          "description": "Default 상태의 위젯 박스에 적용되는 색상이다."
+        },
+        "hover1": {
+          "value": "#F2F2f2",
+          "type": "color",
+          "description": "Hover1 상태의 위젯 박스에 적용되는 색상이다."
+        },
+        "hover2": {
+          "value": "#f2f2f2",
+          "type": "color",
+          "description": "Hover2 상태의 위젯 박스에 적용되는 색상이다."
+        },
+        "pressed": {
+          "value": "#F5F5F5",
+          "type": "color",
+          "description": "Pressed 상태의 위젯 박스에 적용되는 색상이다."
+        }
+      }
+    },
+    "checkbox": {
+      "color": {
+        "default": {
+          "value": "#FFFFFF",
+          "type": "color",
+          "description": "Default 상태의 체크박스에 적용되는 색상이다."
+        },
+        "hover1": {
+          "value": "#FFFFFF",
+          "type": "color",
+          "description": "Hover1 상태의 체크박스에 적용되는 색상이다."
+        },
+        "hover2": {
+          "value": "#3034ec",
+          "type": "color",
+          "description": "Hover2 상태의 체크박스에 적용되는 색상이다."
+        },
+        "pressed": {
+          "value": "#6366f1",
+          "type": "color",
+          "description": "Pressed 상태의 체크박스에 적용되는 색상이다."
+        }
+      }
+    }
+  }
+}
